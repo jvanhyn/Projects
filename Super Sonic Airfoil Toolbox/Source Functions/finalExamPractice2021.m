@@ -11,8 +11,8 @@ clear
 clc
 
 % Setup
-Minf = 4;
-lambda = 15;
+Minf = 2;
+lambda = 17;
 gamma = 1.4;
 
 % 1 - Shock 
@@ -104,3 +104,6 @@ cm_LE = ssMomentLE(p5_0,p6_0,p7_0,p7_0,Mu1,lambda1,lambda2,gamma);
 % Answer
 Q5 = {[p5_0 p6_0 p7_0 p8_0], [Md5 Md6 Md7 Md8]};
 Q6 = [Cl2 Cd2];
+
+
+%%%

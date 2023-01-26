@@ -1,6 +1,6 @@
 clear 
 close all
-load("stepdata.mat");
+load("week2data.mat");
 clc
 
 %% DATA
