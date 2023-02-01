@@ -1,18 +1,18 @@
 clear 
 close all
-load("stepdata.mat");
+load("week2data.mat");
 clc
 
 %% DATA
-S = (step1 + step2 + step3 + step4 + step5)./5;
-
+snip = 68;
+S = (ax21(1:snip,:) + ax22(1:snip,:) + ax23(1:snip,:) + ax24(1:snip,:) + ax25(1:snip,:))./5;
 u = S(:,3);
 y1 = S(:,4);
 t1 = S(:,2);
-y2 = diff(S(:,4));
-t2 = t1(1:end-1);
-y3 = lowpass(diff(y2),0.1);
-t3 = t1(1:end-2);
+dy1 = diff(S(:,4));
+dt1 = t1(1:end-1);
+
+clear ax21 ax22 ax23 ax24 ax25 S snip 
 
 %% Figure 1
 figure(1)
@@ -23,194 +23,144 @@ plot(t1,u,"LineWidth",2)
 grid on
 grid minor
 title('Input')
-xlim([0 6])
+
+
 subplot(3,1,2)
+hold on
 plot(t1,y1,"LineWidth",2)
 grid on
 grid minor
 title("Position")
-xlim([0 6])
+
+ylim([0 600])
+
 
 subplot(3,1,3)
-plot(t2,y2,"LineWidth",2)
+plot(dt1,dy1,"LineWidth",2)
 grid on
 grid minor
 title("Velocity")
-xlim([0 6])
-%% Predictions 
-% yon = y2(1:)
-% [M I] = max(yw);
-% RT = t2(I);
 
-%% Simulation Prediction
+%% Predictions
+%y1 = y1-75*t1;
+S = stepinfo(y1,t1,"RiseTimeThreshhold",[0 1],'SettlingTimeThreshold',0.15);
+RT = S.RiseTime;
+ST = S.SettlingTime;
+yss = y1(cast(ST/mean(diff(t1)),'uint32')+3);
 
-Khw = 9.7656e-03;        % Hardware Gain
-t = 0.009*(0:677);       % Simulation Time
-dtu = 3;                 % Step Length
+[pks,locs] = findpeaks(y1,t1);
+wd = 2*pi*(length(pks)-1)/(locs(end)-locs(1));
+bwn = 1/(locs(end-1)-locs(1))*log((pks(1)-yss)/(pks(end)-yss));
 
-wn=2*pi*2;
-beta=0.1;
-K=750;
+wn = sqrt(wd^2+bwn^2);
+z2 = bwn/wn;
+K = yss;
+
+%%% Prediction Plot
+% 
+% figure(1)
+% subplot(3,1,2)
+% hold on 
+% subplot(3,1,2)
+% xline(ST)
+% xline(RT)
+% hold off
+
+%% Verification 
+ts = linspace(0,3,1000);                       % Simulation Time
+dtu = 3;                                  % Dwell Time 
+Ustp = @(x) ((x > 0) - 0*(x>dtu));          % Step function
+us = (Ustp(ts) - Ustp(ts-dtu));             % Simulation Input
+
+Khw = 9.7656e-02;                         % Hardware Gain
 
 
-Ustp = @(x) (x > 0) - 0*(x>dtu);          % Step function
-u = (Ustp(t) - Ustp(t-dtu));            % Simulation Input
+G22 = tf(K*wn^2,[1 2*z2*wn wn^2]);      % Transfer function from Voltage to Position
 
 
-G22 = tf(K*wn^2,[1 2*beta*wn wn^2]);      % Transfer function from Voltage to Position
+y2 = lsim(G22, us, ts);                    %  Simluated position using LinSim
+t2 = ts;   
 
+dy2 = diff(y2)*1/9.7656e-02;                          % Velocity
+dt2 = t2(1:end-1);
 
-y1 = lsim(G22, u, t);           % Simluated position using LinSim
-t1 = t;   
-
-y2 = diff(y1);                          % Velocity
-t2 = t1(1:end-1);
-
-y3 = diff(y1,2);                        % Acceleration
-t3 = t1(1:end-2);
-
-
+%% Figure 2
 figure(2)
 sgtitle("SYM DATA - AX2 PREDICTION", "FontName","Cambria")
 
 subplot(3,1,1)
-plot(t1,u,"LineWidth",2)
+plot(t2,us,"LineWidth",2)
 grid on
 grid minor
 title('Input')
-xlim([0 6])
 subplot(3,1,2)
-plot(t1,y1,"LineWidth",2)
-xlim([0 6])
+plot(t2,y2,"LineWidth",2)
+xlim([0 3])
 grid on
 grid minor
 title("Position")
 subplot(3,1,3)
-plot(t2,y2,"LineWidth",2)
+plot(dt2,dy2,"LineWidth",2)
 grid on
 grid minor
 title("Velocity")
-xlim([0 6])
-%% 
-[M, I] = max(y1);
-trise= t(I);
-m = mean(y1(1:334));
-[m,i] = min(abs(((y1-m)/M)-0.01));
-tsettle = t(i);
 
+%% Figure 3
 
-hold on 
-subplot(3,1,2)
-xline(tsettle)
-xline(trise)
-hold off
-
-wn = 1.8/trise;
-beta = 4.6/tsettle/wn;
-K = y1(344);
-
-%%
-[M, I] = max(y2);
-t0 = t(I);
-[Gm,Pm,Wcg,Wcp] = margin(G22);
-
-
-wn = 1.8/RT;
-beta = 4.6/ST/wn;
-K = st(end);
-%% 77777
-G22 = tf(K*wn^2,[1 2*beta*wn wn^2]);      % Transfer function from Voltage to Position
-
-
-y1 = lsim(G22, u, t);           % Simluated position using LinSim
-t1 = t;   
-
-y2 = diff(y1);                          % Velocity
-t2 = t1(1:end-1);
-
-y3 = diff(y1,2);                        % Acceleration
-t3 = t1(1:end-2);
-
-%% Figure 2
 figure(3)
-sgtitle("SYM DATA - AX2 VALIDATION", "FontName","Cambria")
+sgtitle("LAB DATA - AX2", "FontName","Cambria")
 
 subplot(3,1,1)
 plot(t1,u,"LineWidth",2)
 grid on
 grid minor
 title('Input')
-xlim([0 6])
+
+
 subplot(3,1,2)
+hold on
 plot(t1,y1,"LineWidth",2)
 grid on
 grid minor
 title("Position")
-xlim([0 6])
+ylim([0 600])
 
 subplot(3,1,3)
-plot(t2,y2,"LineWidth",2)
+hold on
+plot(dt1,dy1,"LineWidth",2)
 grid on
 grid minor
 title("Velocity")
-xlim([0 6])
 
-st = step(G22);
-S = stepinfo(G22,'RiseTimeLimits',[0 1]);
-eta = Pm/100;
-RT = S.RiseTime;
-MP = S.Overshoot;
-ST = S.SettlingTime;
-
-hold on 
+subplot(3,1,1)
+plot(t2,us,"LineWidth",2)
+grid on
+grid minor
+title('Input')
 subplot(3,1,2)
-xline(RT)
-xline(ST)
-hold off
-
+plot(t2,y2,"LineWidth",2)
+xlim([0 3])
+grid on
+grid minor
+title("Position")
+subplot(3,1,3)
+plot(dt2,dy2,"LineWidth",2)
+grid on
+grid minor
+title("Velocity")
 %% Controller Design 
-figure()
-rlocus(G22)
-
-a = 1;
-b = 11;
-
-% D1 = tf(1,[1 0]);
-% D2 = tf([1 a],1);
-% D3 = tf([1 b],1);
-% 
-% D4 = D1*D2*D3;
-% 
-% GD1 = G22*D4;
-figure()
-rlocus(GD1)
-
-figure
-margin(GD1)
-%%
-
-K = 0.0001;
-Ki = 1
-Kd = 1000
+Ku = 1
+Tu;
+Kp = 0.6*Ku;
+Ki = 1.2*Ku/Tu;
+Kd = 0.075*Ku*Tu;
 
 P = tf(K,1);
 I = tf(Ki,[1 0]);
 D = tf(Kd*[1 0],1);
 
-
-D1 = (P+I+D);
-GD = G22*D1;
-% 
-figure(1)
-hold on
-margin(D1)
-
-figure(1)
-margin(G22)
-% hold off
-figure(2)
-margin(GD)
-
+D3 = 1/Khw*(P+D+I);
+GD = G22*D3;
 
 H = GD/(1+GD);
 
@@ -218,39 +168,56 @@ H = GD/(1+GD);
 [mag,phase,wout] = bode(GD,{0,5000});
 S = stepinfo(H,'RiseTimeLimits',[0 1]);
 
-eta = Pm/100;
-RT = S.RiseTime;
-MP = S.Overshoot
+figure()
+s = step(H);
+plot(s)
+% eta = Pm/100;
+% RT = S.RiseTime;
+% MP = S.Overshoot
+% close
+% figure(4)
+% title('Locus and Resulting Pole Placement')
+% hold on
+% rlocus(GD)
+% plot(pole(H),'x')
+% hold off
+%% Phase Margin 
 figure(5)
-hold on
-step(H)
-hold off
+margin(D3)
+xlim([1 10e5])
+figure(6)
+margin(G22)
+xlim([1 10e5])
+figure(7)
+margin(GD)
+xlim([1 10e5])
+%% Verification 
+uz = sin(ts);
+y1 = lsim(H*tf([0 0 1],1), us, ts);             % simluated position
+dy1 = lsim(H*tf([0 1 0],1), us, ts);             % simluated velocity
 
-%% Simulation
-u = sin(t);
-y1 = lsim(H*tf([0 0 1],1), u, t);             % simluated position
-y2 = lsim(H*tf([0 1 0],1), u, t);             % simluated velocity
-
-figure(4)
+%% Figure 8
+figure(8)
 sgtitle("SYM DATA - AX2 PID", "FontName","Cambria")
 
 subplot(3,1,1)
-plot(t,u,"LineWidth",2)
+plot(ts,us,"LineWidth",2)
 grid on
 grid minor
 title('Input')
 xlim([0 6]);
 
 subplot(3,1,2)
-plot(t,y1,"LineWidth",2)
+plot(ts,y1,"LineWidth",2)
 grid on
 grid minor
 title("Position")
 xlim([0 6]);
 
 subplot(3,1,3)
-plot(t,y2,"LineWidth",2)
+plot(ts,dy1,"LineWidth",2)
 grid on
 grid minor
 title("Velocity")
 xlim([0 6]);
+
