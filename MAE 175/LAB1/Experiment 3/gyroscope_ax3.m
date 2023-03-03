@@ -51,9 +51,6 @@ D = tf(Kd*[1 0],1);
 D3 = P + D + I;
 GD = G42*D3;
 
-
-% rlocus(GD)
-% % 
 H = GD/(1+GD);
 % % figure(8)
 % % step(H)
